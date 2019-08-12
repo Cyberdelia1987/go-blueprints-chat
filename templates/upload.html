@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+    <div class="page-header pb-2 mt-4 mb-2 border-bottom">
+        <h1>Upload picture</h1>
+    </div>
+    <form action="/uploader" role="form" enctype="multipart/form-data" method="post">
+        <input type="hidden" name="user_id" value="{{.UserData.user_id}}">
+        <div class="form-group">
+            <label for="avatar_file">Select file</label>
+            <input type="file" name="avatar_file">
+        </div>
+        <input type="submit" value="Upload" class="btn btn-primary">
+    </form>
+</div>
+</body>
+</html>

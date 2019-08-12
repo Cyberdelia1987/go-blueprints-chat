@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        input { display: block; }
+        ul { list-style: none; }
+        .message-container::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+        #messages .message {
+            padding: 10px;
+            background: #ecfbff;
+            border-radius: 3px;
+            border: 1px solid lightblue;
+            margin-bottom: 10px;
+            max-width: 500px;
+            display: table;
+            width: auto;
+            min-width: 250px;
+            font-family: sans-serif;
+            font-size: 13px;
+        }
+        #messages .message.reply {
+            float: right;
+            background: #f5f5f5;
+            border-color: #d6d6d6;
+        }
+        #messages .message::after {
+            content: "";
+            clear: both;
+            display: table;
+
+        }
+        .message .message-text {
+            margin: 5px;
+        }
+        .message .timestamp {
+            float: right;
+            font-size: 0.8em;
+            color: #ccc;
+        }
+        .message-container .avatar img {
+            max-width: 30px;
+        }
+        .message-container .avatar {
+            width: 32px;
+            height: 32px;
+            overflow: hidden;
+        }
+        .message-container.reply .avatar {
+            float: right;
+            margin-left: 10px;
+        }
+        .message-container.dialog .avatar {
+            float: left;
+            margin-right: 10px;
+        }
+    </style>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div id="messages"></div>
+        </div>
+    </div>
+    <form id="chatbox" role="form">
+        <div class="form-group">
+            <label for="messages">Send a message as {{.UserData.name}}</label> or <a href="/logout">Sign out</a>
+        </div>
+        <textarea id="message" class="form-control"></textarea>
+        <input type="submit" value="Send" class="btn btn-primary"/>
+    </form>
+</div>
+<script>
+    $(function () {
+        let socket = null;
+        let msgBox = $("#chatbox textarea");
+        let messages = $("#messages");
+        let user_id = "{{.UserData.user_id}}";
+        $("#chatbox").submit(function () {
+            if (!msgBox.val()) return false;
+            if (!socket) {
+                alert("Error: There is no socket connection.");
+                return false;
+            }
+            socket.send(JSON.stringify({"Message": msgBox.val()}));
+            msgBox.val("");
+            return false;
+        });
+        if (!window["WebSocket"]) {
+            alert("Error: Your browser does not support web  sockets.")
+        } else {
+            socket = new WebSocket("ws://{{.Host}}/room");
+            socket.onclose = function () {
+                alert("Connection has been closed.");
+            };
+            socket.onmessage = function (e) {
+                let Msg = JSON.parse(e.data);
+                let messageClass = Msg.UserId == user_id ? "reply" : "dialog";
+                messages.append(
+                    $('<div class="message-container ' + messageClass + '">').append(
+                        $('<div class="avatar rounded-circle border border-secondary">').append(
+                            $('<img>').attr("src", Msg.AvatarURL).attr("title", Msg.Name)
+                        ),
+                        $('<div class="message ' + messageClass + '">').append(
+                            $('<strong class="username">').text(Msg.Name + ": "),
+                            $('<p class="message-text">').text(Msg.Message),
+                            $('<span class="timestamp">').text(Msg.When)
+                        )
+                    )
+                );
+            }
+        }
+    });
+</script>
+</body>
+</html>
