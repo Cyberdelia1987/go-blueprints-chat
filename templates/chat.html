@@ -13,9 +13,9 @@
             display: table;
         }
         #messages .message {
-            padding: 10px;
+            padding: 5px 8px;
             background: #ecfbff;
-            border-radius: 3px;
+            border-radius: 12px;
             border: 1px solid lightblue;
             margin-bottom: 10px;
             max-width: 500px;
@@ -37,12 +37,12 @@
 
         }
         .message .message-text {
-            margin: 5px;
+            margin-bottom: 5px;
         }
         .message .timestamp {
             float: right;
-            font-size: 0.8em;
-            color: #ccc;
+            font-size: 0.7em;
+            color: #aaa;
         }
         .message-container .avatar img {
             max-width: 30px;
@@ -72,7 +72,10 @@
             margin-bottom: 0;
         }
     </style>
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -84,7 +87,7 @@
     </div>
     <form id="chatbox" role="form">
         <div class="form-group">
-            <label for="messages">Send a message as {{.UserData.name}}</label> or <a href="/logout">Sign out</a>
+            <label for="message">Send a message as {{.UserData.name}}</label> or <a href="/logout">Sign out</a>
         </div>
         <textarea id="message" class="form-control"></textarea>
         <input type="submit" value="Send" class="btn btn-primary"/>
@@ -96,8 +99,10 @@
         let msgBox = $("#chatbox textarea");
         let messages = $("#messages");
         let user_id = "{{.UserData.user_id}}";
-        $("#chatbox").submit(function () {
-            if (!msgBox.val()) return false;
+        let reconnectAttempts = 0;
+        let chatbox = $("#chatbox");
+        chatbox.submit(function () {
+            if (!msgBox.val().trim()) return false;
             if (!socket) {
                 attachAlert("Error: There is no socket connection.", 'error');
                 return false;
@@ -106,33 +111,54 @@
             msgBox.val("");
             return false;
         });
+        $("body").tooltip({selector: "[rel=tooltip]"});
+        $("#message").keydown(function (e) {
+            if (e.which === 13 && (e.ctrlKey || e.metaKey)) {
+                let selectionStart = e.target.selectionStart;
+                $(this).val(function (i, val) {
+                    return val.substring(0, selectionStart) + "\n" + val.substring(selectionStart);
+                });
+            }
+        }).keypress(function (e) {
+            if (e.which === 13 && !e.ctrlKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                chatbox.submit();
+            }
+        });
 
         connect();
 
         function connect() {
+            if (reconnectAttempts >= 10) {
+                attachAlert("Reconnect attempts amount has exceeded, please refresh page and try again", "danger");
+                return;
+            }
+            reconnectAttempts++;
             if (!window["WebSocket"]) {
-                attachAlert('Error: Your browser does not support web  sockets.', 'error')
+                attachAlert("Error: Your browser does not support web  sockets.", "danger");
             } else {
                 socket = new WebSocket("ws://{{.Host}}/room");
                 socket.onopen = function () {
-                    attachAlert("Connection successfully established", "success", 1000)
+                    reconnectAttempts = 0;
+                    attachAlert("Connection successfully established", "success", 1000);
                 };
                 socket.onclose = function () {
-                    attachAlert('Connection has been closed. Trying to reconnect.', "warning", 5000);
+                    attachAlert("Connection has been closed. Trying to reconnect (" + reconnectAttempts + ")", "warning", 6000);
                     setTimeout(connect, 5000)
                 };
                 socket.onmessage = function (e) {
                     let Msg = JSON.parse(e.data);
                     let messageClass = Msg.UserId === user_id ? "reply" : "dialog";
+                    let time = moment(Msg.When);
                     messages.append(
                         $('<div class="message-container ' + messageClass + '">').append(
-                            $('<div class="avatar rounded-circle border border-secondary">').append(
-                                $('<img>').attr("src", Msg.AvatarURL).attr("title", Msg.Name)
-                            ),
+                            $('<div class="avatar rounded-circle border border-secondary" rel="tooltip" data-placement="right">').append(
+                                $('<img>').attr("src", Msg.AvatarURL)
+                            ).attr("title", Msg.Name),
                             $('<div class="message ' + messageClass + '">').append(
-                                $('<strong class="username">').text(Msg.Name + ": "),
-                                $('<p class="message-text">').text(Msg.Message),
-                                $('<span class="timestamp">').text(Msg.When)
+                                $('<p class="message-text">').html(Msg.Message.replace(/\n/g, "<br>")),
+                                $('<span class="timestamp">').text(time.format("YYYY-MM-DD HH:mm:ss"))
                             )
                         )
                     );
