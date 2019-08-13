@@ -60,6 +60,17 @@
             float: left;
             margin-right: 10px;
         }
+        #alerts {
+            margin-top: 15px;
+        }
+        #alerts .alert {
+            padding: 5px 10px;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        #alerts .alert:last-child {
+            margin-bottom: 0;
+        }
     </style>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 </head>
@@ -68,6 +79,7 @@
     <div class="card">
         <div class="card-body">
             <div id="messages"></div>
+            <div id="alerts"></div>
         </div>
     </div>
     <form id="chatbox" role="form">
@@ -87,35 +99,60 @@
         $("#chatbox").submit(function () {
             if (!msgBox.val()) return false;
             if (!socket) {
-                alert("Error: There is no socket connection.");
+                attachAlert("Error: There is no socket connection.", 'error');
                 return false;
             }
             socket.send(JSON.stringify({"Message": msgBox.val()}));
             msgBox.val("");
             return false;
         });
-        if (!window["WebSocket"]) {
-            alert("Error: Your browser does not support web  sockets.")
-        } else {
-            socket = new WebSocket("ws://{{.Host}}/room");
-            socket.onclose = function () {
-                alert("Connection has been closed.");
-            };
-            socket.onmessage = function (e) {
-                let Msg = JSON.parse(e.data);
-                let messageClass = Msg.UserId == user_id ? "reply" : "dialog";
-                messages.append(
-                    $('<div class="message-container ' + messageClass + '">').append(
-                        $('<div class="avatar rounded-circle border border-secondary">').append(
-                            $('<img>').attr("src", Msg.AvatarURL).attr("title", Msg.Name)
-                        ),
-                        $('<div class="message ' + messageClass + '">').append(
-                            $('<strong class="username">').text(Msg.Name + ": "),
-                            $('<p class="message-text">').text(Msg.Message),
-                            $('<span class="timestamp">').text(Msg.When)
+
+        connect();
+
+        function connect() {
+            if (!window["WebSocket"]) {
+                attachAlert('Error: Your browser does not support web  sockets.', 'error')
+            } else {
+                socket = new WebSocket("ws://{{.Host}}/room");
+                socket.onopen = function () {
+                    attachAlert("Connection successfully established", "success", 1000)
+                };
+                socket.onclose = function () {
+                    attachAlert('Connection has been closed. Trying to reconnect.', "warning", 5000);
+                    setTimeout(connect, 5000)
+                };
+                socket.onmessage = function (e) {
+                    let Msg = JSON.parse(e.data);
+                    let messageClass = Msg.UserId === user_id ? "reply" : "dialog";
+                    messages.append(
+                        $('<div class="message-container ' + messageClass + '">').append(
+                            $('<div class="avatar rounded-circle border border-secondary">').append(
+                                $('<img>').attr("src", Msg.AvatarURL).attr("title", Msg.Name)
+                            ),
+                            $('<div class="message ' + messageClass + '">').append(
+                                $('<strong class="username">').text(Msg.Name + ": "),
+                                $('<p class="message-text">').text(Msg.Message),
+                                $('<span class="timestamp">').text(Msg.When)
+                            )
                         )
-                    )
-                );
+                    );
+                };
+            }
+        }
+
+        let alerts = $('#alerts');
+
+        function attachAlert(message, alertType, dismissTimeout) {
+            if (typeof alertType == 'undefined') {
+                alertType = 'warning'
+            }
+            let alert = $('<div class="alert alert-' + alertType + '" role="alert">')
+                .click(function () {$(this).remove()})
+                .text(message);
+            alerts.append(alert);
+
+            if (dismissTimeout) {
+                setTimeout(function () {alert.remove()}, dismissTimeout)
             }
         }
     });
